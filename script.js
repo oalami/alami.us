@@ -14,12 +14,75 @@ const pointer = {
 
 const glyphs = [".", "·", "*", "+", "~", "░", "▒", "/", "\\", "|", "<", ">"];
 let cells = [];
-let ghostPoints = [];
 let columns = 0;
 let rows = 0;
 let cellSize = 28;
 let devicePixelRatio = 1;
 let frame = 0;
+
+// --- GHOST ECHO LOGIC ---
+
+const ghost = {
+  x: window.innerWidth / 2,
+  y: window.innerHeight / 2,
+  targetX: window.innerWidth / 2,
+  targetY: window.innerHeight / 2,
+  path: [],
+  currentIndex: 0,
+  active: false,
+};
+
+const myPath = [];
+const MAX_PATH_LENGTH = 400;
+
+async function initGhost() {
+  try {
+    const res = await fetch("/api/ghosts");
+    const path = await res.json();
+    if (Array.isArray(path) && path.length > 0) {
+      ghost.path = path;
+      ghost.active = true;
+      // Start ghost at the first point
+      ghost.x = ghost.targetX = path[0].x * window.innerWidth;
+      ghost.y = ghost.targetY = path[0].y * window.innerHeight;
+    }
+  } catch (e) {
+    /* silent fail */
+  }
+}
+
+function updateGhost() {
+  if (!ghost.active || ghost.path.length === 0) return;
+
+  const point = ghost.path[ghost.currentIndex];
+  ghost.targetX = point.x * window.innerWidth;
+  ghost.targetY = point.y * window.innerHeight;
+
+  // Glide towards the target point
+  ghost.x += (ghost.targetX - ghost.x) * 0.1;
+  ghost.y += (ghost.targetY - ghost.y) * 0.1;
+
+  // If we are close enough to the target point, move to the next one
+  const dist = Math.hypot(ghost.targetX - ghost.x, ghost.targetY - ghost.y);
+  if (dist < 5) {
+    ghost.currentIndex = (ghost.currentIndex + 1) % ghost.path.length;
+  }
+}
+
+async function saveMyPath() {
+  if (myPath.length < 20) return;
+  try {
+    await fetch("/api/ghosts", {
+      method: "POST",
+      body: JSON.stringify({ path: myPath }),
+      keepalive: true, // Important for saving on page hide
+    });
+  } catch (e) {
+    /* silent fail */
+  }
+}
+
+// --- CORE LOGIC ---
 
 function setPointer(x, y) {
   pointer.targetX = x;
@@ -28,7 +91,18 @@ function setPointer(x, y) {
   root.style.setProperty("--pointer-y", `${y}px`);
   root.style.setProperty("--tilt-x", `${x - window.innerWidth / 2}`);
   root.style.setProperty("--tilt-y", `${y - window.innerHeight / 2}`);
-  reportGhost(x, y);
+
+  // Record path
+  if (
+    myPath.length === 0 ||
+    Math.hypot(
+      x / window.innerWidth - myPath[myPath.length - 1].x,
+      y / window.innerHeight - myPath[myPath.length - 1].y,
+    ) > 0.01
+  ) {
+    myPath.push({ x: x / window.innerWidth, y: y / window.innerHeight });
+    if (myPath.length > MAX_PATH_LENGTH) myPath.shift();
+  }
 }
 
 function resizeCanvas() {
@@ -58,8 +132,10 @@ function resizeCanvas() {
 }
 
 function drawGlyphField() {
+  // Update pointers
   pointer.x += (pointer.targetX - pointer.x) * 0.08;
   pointer.y += (pointer.targetY - pointer.y) * 0.08;
+  updateGhost();
 
   ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   ctx.font =
@@ -67,38 +143,27 @@ function drawGlyphField() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  const now = Date.now();
-
   for (const cell of cells) {
     const wave = Math.sin(frame * cell.speed + cell.drift);
 
-    // Interaction with user pointer
+    // User Interaction
     const dx = cell.x - pointer.x;
     const dy = cell.y - pointer.y;
     const distance = Math.hypot(dx, dy);
     const pull = Math.max(0, 1 - distance / 190);
 
-    // Interaction with ghost points
-    let ghostPull = 0;
-    for (const gp of ghostPoints) {
-      const gdx = cell.x - gp.x;
-      const gdy = cell.y - gp.y;
-      const gDist = Math.hypot(gdx, gdy);
-      // Ghosts have a tighter, softer pull
-      const p = Math.max(0, 1 - gDist / 120);
-      // Fade ghost pull based on age (45s max)
-      const ageFade = Math.max(0, 1 - (now - gp.ts) / 45000);
-      ghostPull += p * ageFade;
-    }
-    ghostPull = Math.min(ghostPull, 1);
+    // Ghost Interaction
+    const gdx = cell.x - ghost.x;
+    const gdy = cell.y - ghost.y;
+    const gDistance = Math.hypot(gdx, gdy);
+    const gPull = Math.max(0, 1 - gDistance / 140);
 
-    const alpha = 0.06 + pull * 0.58 + ghostPull * 0.25 + (wave + 1) * 0.025;
-    const lift = pull * -10 + ghostPull * -5 + wave * 1.5;
-    const slide = pull * (dx > 0 ? 5 : -5);
+    const alpha = 0.06 + pull * 0.58 + gPull * 0.3 + (wave + 1) * 0.025;
+    const lift = pull * -10 + gPull * -6 + wave * 1.5;
+    const slide = pull * (dx > 0 ? 5 : -5) + gPull * (gdx > 0 ? 3 : -3);
 
-    // If ghost is present, shift color slightly to violet
-    if (ghostPull > 0.1 && pull < 0.2) {
-      ctx.fillStyle = `rgba(195, 180, 255, ${alpha})`;
+    if (gPull > 0.1 && pull < 0.2) {
+      ctx.fillStyle = `rgba(210, 190, 255, ${Math.min(alpha * 1.2, 1)})`;
     } else {
       ctx.fillStyle = `rgba(176, 220, 255, ${alpha})`;
     }
@@ -112,6 +177,12 @@ function drawGlyphField() {
     requestAnimationFrame(drawGlyphField);
   }
 }
+
+// Save path on exit or every 20 seconds
+setInterval(saveMyPath, 20000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") saveMyPath();
+});
 
 window.addEventListener("pointermove", (event) => {
   setPointer(event.clientX, event.clientY);
@@ -128,4 +199,5 @@ window.addEventListener("resize", () => {
 
 resizeCanvas();
 setPointer(pointer.x, pointer.y);
+initGhost();
 drawGlyphField();

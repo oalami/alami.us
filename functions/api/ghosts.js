@@ -1,38 +1,35 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // For this to work in production, a KV namespace must be bound to GHOST_DATA
-  // If no KV is bound, we'll fall back to a no-op so the site doesn't crash.
   if (!env.GHOST_DATA) {
     return new Response(JSON.stringify([]), {
       headers: { "Content-Type": "application/json" },
     });
   }
 
+  // POST: A visitor is finishing their session and saving their path
   if (request.method === "POST") {
     try {
-      const { x, y } = await request.json();
-      const current = (await env.GHOST_DATA.get("recent_ghosts")) || "[]";
-      let ghosts = JSON.parse(current);
+      const { path } = await request.json();
+      if (!Array.isArray(path) || path.length < 5) {
+        return new Response("too short", { status: 400 });
+      }
 
-      const now = Date.now();
-      ghosts.push({ x, y, ts: now });
-
-      // Keep only last 25 ghosts and filter out ones older than 45 seconds
-      ghosts = ghosts.slice(-25).filter((g) => now - g.ts < 45000);
-
-      await env.GHOST_DATA.put("recent_ghosts", JSON.stringify(ghosts), {
-        expirationTtl: 60, // Auto-expire the key if no updates for 1 min
+      // We only store the absolute latest path.
+      // Last visitor wins, which is perfect for this vibe.
+      await env.GHOST_DATA.put("last_visitor_path", JSON.stringify(path), {
+        expirationTtl: 86400, // Path expires after 24 hours of inactivity
       });
 
-      return new Response("spooky", { status: 201 });
+      return new Response("echoed", { status: 201 });
     } catch (e) {
       return new Response("error", { status: 400 });
     }
   }
 
-  const ghosts = (await env.GHOST_DATA.get("recent_ghosts")) || "[]";
-  return new Response(ghosts, {
+  // GET: Fetch the latest stored path
+  const path = (await env.GHOST_DATA.get("last_visitor_path")) || "[]";
+  return new Response(path, {
     headers: { "Content-Type": "application/json" },
   });
 }

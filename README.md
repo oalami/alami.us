@@ -12,11 +12,11 @@ npx wrangler pages dev .
 
 Then open <http://localhost:8788>.
 
-### Ghost Echoes
-The "Ghost Echoes" feature uses Cloudflare KV to store and display recent visitor trails. When running locally, Wrangler simulates the KV store. To test it:
-1. Open the local URL in two separate browser windows.
-2. Move your mouse in one window.
-3. Wait a few seconds to see the "ghost" appear in the other window.
+### Visitor Echoes
+The "Visitor Echoes" feature creates a shared, haunted experience by recording and playing back the mouse movements of previous visitors.
+- **Recording:** Your mouse path is recorded locally (up to 400 points) and saved to Cloudflare KV when you leave the page or every 20 seconds.
+- **Playback:** When a new visitor arrives, the site fetches the most recent visitor's path and plays it back as a faint, shimmering violet trail that glides smoothly across the background glyphs.
+- **Fluidity:** The ghost uses linear interpolation to ensure movement is organic and 60fps, even if the recording was low-fidelity.
 
 ## Deployment
 

@@ -123,7 +123,6 @@ async function saveMyPath() {
 
 const kickers = [
   "it's me",
-  "it's you?",
   "expecting you",
   "static in the wire",
   "the door was unlocked",
@@ -139,7 +138,9 @@ const kickers = [
   "is it you?",
   "found this",
   "drifting",
-  "vibes all the way",
+  "missing you",
+  "habibi",
+  "zoom and enhance",
 ];
 
 function setRandomKicker() {

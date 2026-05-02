@@ -6,8 +6,8 @@ A single-page personal website and text-based visual experiment.
 
 - Refined Glyph Field
 - Random Welcomes
-- Rare Echoes:
-- Ghost Telemetry:
+- Rare Echoes
+- Ghost Telemetry
 
 ## Local Development
 

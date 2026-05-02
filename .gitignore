@@ -1,5 +1,7 @@
 .DS_Store
 .wrangler/
+# Optional: if you want to keep the template but not the IDs
+# wrangler.toml
 node_modules/
 dist/
 build/

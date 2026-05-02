@@ -12,7 +12,26 @@ const pointer = {
   targetY: window.innerHeight / 2,
 };
 
-const glyphs = [".", "·", "*", "+", "~", "░", "▒", "/", "\\", "|", "<", ">"];
+const glyphs = [
+  "·",
+  "+",
+  "~",
+  "▒",
+  "/",
+  "\\",
+  "|",
+  "‖",
+  "⁞",
+  "∫",
+  "<",
+  ">",
+  "✦",
+  "⚹",
+  "⁂",
+  "꩜",
+  "᯽",
+  "🝓",
+];
 let cells = [];
 let columns = 0;
 let rows = 0;
@@ -62,6 +81,24 @@ function updateGhost() {
   ghost.x += (ghost.targetX - ghost.x) * 0.1;
   ghost.y += (ghost.targetY - ghost.y) * 0.1;
 
+  // Update terminal signal every 60 frames (approx 1s) to be less distracting
+  if (frame % 60 === 0) {
+    const signalElement = document.querySelector("#ghost-signal");
+    if (signalElement) {
+      const dx = ghost.x - window.innerWidth / 2;
+      const dy = ghost.y - window.innerHeight / 2;
+      const dist = Math.hypot(dx, dy);
+      const maxDist = Math.hypot(window.innerWidth / 2, window.innerHeight / 2);
+      const intensity = Math.min(dist / (maxDist * 0.6), 1);
+      const freq = (0.1 + intensity * 0.4).toFixed(3);
+
+      const bars = [" ", "░", "▒", "▓", "█"];
+      const barCount = Math.floor(intensity * 5);
+      const bar = "█".repeat(barCount).padEnd(5, "░");
+      signalElement.innerText = `${freq}hz [${bar}]`;
+    }
+  }
+
   // If we are close enough to the target point, move to the next one
   const dist = Math.hypot(ghost.targetX - ghost.x, ghost.targetY - ghost.y);
   if (dist < 5) {
@@ -83,6 +120,35 @@ async function saveMyPath() {
 }
 
 // --- CORE LOGIC ---
+
+const kickers = [
+  "it's me",
+  "it's you?",
+  "expecting you",
+  "static in the wire",
+  "the door was unlocked",
+  "signal received",
+  "don't look back",
+  "you are here",
+  "finally",
+  "echoes only",
+  "still shimmering",
+  "a quiet corner",
+  "light through the mesh",
+  "just checking",
+  "is it you?",
+  "found this",
+  "drifting",
+  "vibes all the way",
+];
+
+function setRandomKicker() {
+  const kickerElement = document.querySelector(".kicker");
+  if (kickerElement) {
+    kickerElement.innerText =
+      kickers[Math.floor(Math.random() * kickers.length)];
+  }
+}
 
 function setPointer(x, y) {
   pointer.targetX = x;
@@ -121,10 +187,19 @@ function resizeCanvas() {
     const x = (index % columns) * cellSize;
     const y = Math.floor(index / columns) * cellSize;
 
+    // .1% chance of a watermelon or bridge, otherwise pick a random glyph
+    const rand = Math.random();
+    const glyph =
+      rand < 0.001
+        ? "🍉"
+        : rand < 0.002
+          ? "🌉"
+          : glyphs[Math.floor(Math.random() * glyphs.length)];
+
     return {
       x,
       y,
-      glyph: glyphs[Math.floor(Math.random() * glyphs.length)],
+      glyph,
       drift: Math.random() * Math.PI * 2,
       speed: 0.006 + Math.random() * 0.009,
     };
@@ -199,5 +274,6 @@ window.addEventListener("resize", () => {
 
 resizeCanvas();
 setPointer(pointer.x, pointer.y);
+setRandomKicker();
 initGhost();
 drawGlyphField();

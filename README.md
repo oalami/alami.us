@@ -2,6 +2,13 @@
 
 A single-page personal website and text-based visual experiment.
 
+## Visual Experience
+
+- Refined Glyph Field
+- Random Welcomes
+- Rare Echoes:
+- Ghost Telemetry:
+
 ## Local Development
 
 This project uses Cloudflare Pages and Functions. To test the site locally with full functionality (including the Ghost Echoes feature), use the Wrangler CLI:

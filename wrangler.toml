@@ -4,4 +4,4 @@ pages_build_output_dir = "/"
 
 [[kv_namespaces]]
 binding = "GHOST_DATA"
-id = "PASTE_YOUR_KV_NAMESPACE_ID_HERE"
+id = "1b9cbc33e6564bc180f1b6e0828d1e90"

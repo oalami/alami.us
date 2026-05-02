@@ -21,40 +21,6 @@ let cellSize = 28;
 let devicePixelRatio = 1;
 let frame = 0;
 
-// Ghost mechanics
-async function fetchGhosts() {
-  try {
-    const res = await fetch("/api/ghosts");
-    const data = await res.json();
-    // Denormalize percentages back to pixels
-    ghostPoints = data.map((g) => ({
-      x: g.x * window.innerWidth,
-      y: g.y * window.innerHeight,
-      ts: g.ts,
-    }));
-  } catch (e) {
-    /* silent fail */
-  }
-}
-
-let lastSent = 0;
-async function reportGhost(x, y) {
-  if (Date.now() - lastSent < 3000) return; // Report every 3s
-  lastSent = Date.now();
-
-  try {
-    await fetch("/api/ghosts", {
-      method: "POST",
-      body: JSON.stringify({
-        x: x / window.innerWidth,
-        y: y / window.innerHeight,
-      }),
-    });
-  } catch (e) {
-    /* silent fail */
-  }
-}
-
 function setPointer(x, y) {
   pointer.targetX = x;
   pointer.targetY = y;
@@ -146,10 +112,6 @@ function drawGlyphField() {
     requestAnimationFrame(drawGlyphField);
   }
 }
-
-// Initial fetch and set interval
-fetchGhosts();
-setInterval(fetchGhosts, 8000);
 
 window.addEventListener("pointermove", (event) => {
   setPointer(event.clientX, event.clientY);

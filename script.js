@@ -1,7 +1,9 @@
 const root = document.documentElement;
 const canvas = document.querySelector("#glyph-field");
 const ctx = canvas.getContext("2d");
-const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const prefersReducedMotion = window.matchMedia(
+  "(prefers-reduced-motion: reduce)",
+);
 
 const pointer = {
   x: window.innerWidth / 2,
@@ -12,11 +14,46 @@ const pointer = {
 
 const glyphs = [".", "·", "*", "+", "~", "░", "▒", "/", "\\", "|", "<", ">"];
 let cells = [];
+let ghostPoints = [];
 let columns = 0;
 let rows = 0;
 let cellSize = 28;
 let devicePixelRatio = 1;
 let frame = 0;
+
+// Ghost mechanics
+async function fetchGhosts() {
+  try {
+    const res = await fetch("/api/ghosts");
+    const data = await res.json();
+    // Denormalize percentages back to pixels
+    ghostPoints = data.map((g) => ({
+      x: g.x * window.innerWidth,
+      y: g.y * window.innerHeight,
+      ts: g.ts,
+    }));
+  } catch (e) {
+    /* silent fail */
+  }
+}
+
+let lastSent = 0;
+async function reportGhost(x, y) {
+  if (Date.now() - lastSent < 3000) return; // Report every 3s
+  lastSent = Date.now();
+
+  try {
+    await fetch("/api/ghosts", {
+      method: "POST",
+      body: JSON.stringify({
+        x: x / window.innerWidth,
+        y: y / window.innerHeight,
+      }),
+    });
+  } catch (e) {
+    /* silent fail */
+  }
+}
 
 function setPointer(x, y) {
   pointer.targetX = x;
@@ -25,6 +62,7 @@ function setPointer(x, y) {
   root.style.setProperty("--pointer-y", `${y}px`);
   root.style.setProperty("--tilt-x", `${x - window.innerWidth / 2}`);
   root.style.setProperty("--tilt-y", `${y - window.innerHeight / 2}`);
+  reportGhost(x, y);
 }
 
 function resizeCanvas() {
@@ -58,21 +96,47 @@ function drawGlyphField() {
   pointer.y += (pointer.targetY - pointer.y) * 0.08;
 
   ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-  ctx.font = "14px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+  ctx.font =
+    "14px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
+  const now = Date.now();
+
   for (const cell of cells) {
     const wave = Math.sin(frame * cell.speed + cell.drift);
+
+    // Interaction with user pointer
     const dx = cell.x - pointer.x;
     const dy = cell.y - pointer.y;
     const distance = Math.hypot(dx, dy);
     const pull = Math.max(0, 1 - distance / 190);
-    const alpha = 0.06 + pull * 0.58 + (wave + 1) * 0.025;
-    const lift = pull * -10 + wave * 1.5;
+
+    // Interaction with ghost points
+    let ghostPull = 0;
+    for (const gp of ghostPoints) {
+      const gdx = cell.x - gp.x;
+      const gdy = cell.y - gp.y;
+      const gDist = Math.hypot(gdx, gdy);
+      // Ghosts have a tighter, softer pull
+      const p = Math.max(0, 1 - gDist / 120);
+      // Fade ghost pull based on age (45s max)
+      const ageFade = Math.max(0, 1 - (now - gp.ts) / 45000);
+      ghostPull += p * ageFade;
+    }
+    ghostPull = Math.min(ghostPull, 1);
+
+    const alpha = 0.06 + pull * 0.58 + ghostPull * 0.25 + (wave + 1) * 0.025;
+    const lift = pull * -10 + ghostPull * -5 + wave * 1.5;
     const slide = pull * (dx > 0 ? 5 : -5);
 
-    ctx.fillStyle = `rgba(176, 220, 255, ${alpha})`;
+    // If ghost is present, shift color slightly to violet
+    if (ghostPull > 0.1 && pull < 0.2) {
+      ctx.fillStyle = `rgba(195, 180, 255, ${alpha})`;
+    } else {
+      ctx.fillStyle = `rgba(176, 220, 255, ${alpha})`;
+    }
+
     ctx.fillText(cell.glyph, cell.x + slide, cell.y + lift);
   }
 
@@ -82,6 +146,10 @@ function drawGlyphField() {
     requestAnimationFrame(drawGlyphField);
   }
 }
+
+// Initial fetch and set interval
+fetchGhosts();
+setInterval(fetchGhosts, 8000);
 
 window.addEventListener("pointermove", (event) => {
   setPointer(event.clientX, event.clientY);

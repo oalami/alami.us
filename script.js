@@ -1,6 +1,6 @@
 const root = document.documentElement;
 const canvas = document.querySelector("#glyph-field");
-const ctx = canvas.getContext("2d");
+const ctx = canvas?.getContext("2d") ?? null;
 const prefersReducedMotion = window.matchMedia(
   "(prefers-reduced-motion: reduce)",
 );
@@ -92,7 +92,6 @@ function updateGhost() {
       const intensity = Math.min(dist / (maxDist * 0.6), 1);
       const freq = (0.1 + intensity * 0.4).toFixed(3);
 
-      const bars = [" ", "░", "▒", "▓", "█"];
       const barCount = Math.floor(intensity * 5);
       const bar = "█".repeat(barCount).padEnd(5, "░");
       signalElement.innerText = `${freq}hz [${bar}]`;
@@ -173,6 +172,8 @@ function setPointer(x, y) {
 }
 
 function resizeCanvas() {
+  if (!canvas || !ctx) return;
+
   devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.floor(window.innerWidth * devicePixelRatio);
   canvas.height = Math.floor(window.innerHeight * devicePixelRatio);
@@ -208,6 +209,8 @@ function resizeCanvas() {
 }
 
 function drawGlyphField() {
+  if (!ctx) return;
+
   // Update pointers
   pointer.x += (pointer.targetX - pointer.x) * 0.08;
   pointer.y += (pointer.targetY - pointer.y) * 0.08;
@@ -277,4 +280,6 @@ resizeCanvas();
 setPointer(pointer.x, pointer.y);
 setRandomKicker();
 initGhost();
-drawGlyphField();
+if (ctx) {
+  drawGlyphField();
+}

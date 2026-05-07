@@ -98,9 +98,7 @@ export async function onRequest(context) {
 
     // We only store the absolute latest path.
     // Last visitor wins, which is perfect for this vibe.
-    await env.GHOST_DATA.put("last_visitor_path", JSON.stringify(result.path), {
-      expirationTtl: 86400, // Path expires after 24 hours of inactivity
-    });
+    await env.GHOST_DATA.put("last_visitor_path", JSON.stringify(result.path));
 
     return jsonResponse({ status: "echoed" }, { status: 201 });
   }
